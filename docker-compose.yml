@@ -1,0 +1,163 @@
+services:
+  namenode:
+    image: apache/hadoop:3
+    platform: linux/amd64
+    container_name: namenode
+    hostname: namenode
+    command: ["hdfs", "namenode"]
+    environment:
+      - ENSURE_NAMENODE_DIR=/hadoop/dfs/name
+      - CLUSTER_NAME=bigdata-lab
+      - HADOOP_HEAPSIZE_MAX=512m
+      - HADOOP_HEAPSIZE_MIN=256m
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+      - "8088:8088"
+    volumes:
+      - ./hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
+      - ./hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml
+      - ./hadoop/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml
+      - ./hadoop/mapred-site.xml:/opt/hadoop/etc/hadoop/mapred-site.xml
+      - namenode_data:/hadoop/dfs/name
+    networks:
+      - hadoop-net
+    healthcheck:
+      test: ["CMD", "hdfs", "dfsadmin", "-report"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  datanode1:
+    image: apache/hadoop:3
+    platform: linux/amd64
+    container_name: datanode1
+    hostname: datanode1
+    command: ["hdfs", "datanode"]
+    environment:
+      - HADOOP_HEAPSIZE_MAX=512m
+    volumes:
+      - ./hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
+      - ./hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml
+      - ./hadoop/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml
+      - ./hadoop/mapred-site.xml:/opt/hadoop/etc/hadoop/mapred-site.xml
+      - datanode1_data:/hadoop/dfs/data
+    networks:
+      - hadoop-net
+    depends_on:
+      namenode:
+        condition: service_healthy
+
+  datanode2:
+    image: apache/hadoop:3
+    platform: linux/amd64
+    container_name: datanode2
+    hostname: datanode2
+    command: ["hdfs", "datanode"]
+    environment:
+      - HADOOP_HEAPSIZE_MAX=512m
+    volumes:
+      - ./hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
+      - ./hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml
+      - ./hadoop/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml
+      - ./hadoop/mapred-site.xml:/opt/hadoop/etc/hadoop/mapred-site.xml
+      - datanode2_data:/hadoop/dfs/data
+    networks:
+      - hadoop-net
+    depends_on:
+      namenode:
+        condition: service_healthy
+
+  datanode3:
+    image: apache/hadoop:3
+    platform: linux/amd64
+    container_name: datanode3
+    hostname: datanode3
+    command: ["hdfs", "datanode"]
+    environment:
+      - HADOOP_HEAPSIZE_MAX=512m
+    volumes:
+      - ./hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
+      - ./hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml
+      - ./hadoop/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml
+      - ./hadoop/mapred-site.xml:/opt/hadoop/etc/hadoop/mapred-site.xml
+      - datanode3_data:/hadoop/dfs/data
+    networks:
+      - hadoop-net
+    depends_on:
+      namenode:
+        condition: service_healthy
+
+  spark-master:
+    image: apache/spark:3.5.0
+    container_name: spark-master
+    hostname: spark-master
+    user: root
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        export SPARK_NO_DAEMONIZE=true
+        /opt/spark/sbin/start-master.sh
+        tail -f /opt/spark/logs/spark--org.apache.spark.deploy.master.Master-*.out
+    environment:
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=7077
+      - SPARK_MASTER_WEBUI_PORT=8081
+    ports:
+      - "8081:8081"
+      - "7077:7077"
+    volumes:
+      - ./data:/opt/spark-data
+      - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    networks:
+      - hadoop-net
+
+  spark-worker1:
+    image: apache/spark:3.5.0
+    container_name: spark-worker1
+    hostname: spark-worker1
+    user: root
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        export SPARK_NO_DAEMONIZE=true
+        /opt/spark/sbin/start-worker.sh spark://spark-master:7077
+        tail -f /opt/spark/logs/spark--org.apache.spark.deploy.worker.Worker-*.out
+    environment:
+      - SPARK_WORKER_MEMORY=1g
+      - SPARK_WORKER_CORES=2
+    networks:
+      - hadoop-net
+    depends_on:
+      - spark-master
+
+  spark-worker2:
+    image: apache/spark:3.5.0
+    container_name: spark-worker2
+    hostname: spark-worker2
+    user: root
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        export SPARK_NO_DAEMONIZE=true
+        /opt/spark/sbin/start-worker.sh spark://spark-master:7077
+        tail -f /opt/spark/logs/spark--org.apache.spark.deploy.worker.Worker-*.out
+    environment:
+      - SPARK_WORKER_MEMORY=1g
+      - SPARK_WORKER_CORES=2
+    networks:
+      - hadoop-net
+    depends_on:
+      - spark-master
+
+networks:
+  hadoop-net:
+    name: hadoop-net
+    driver: bridge
+
+volumes:
+  namenode_data:
+  datanode1_data:
+  datanode2_data:
+  datanode3_data:
